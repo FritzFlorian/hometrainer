@@ -7,4 +7,11 @@ setup(name='hometrainer',
       author='Fritz Florian',
       license='MIT',
       packages=['hometrainer'],
+      install_requires=[
+          'tensorflow',
+          'pyzmq',
+          'numpy',
+          'py-kim',
+          'matplotlib'
+      ],
       zip_safe=False)
