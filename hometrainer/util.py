@@ -123,7 +123,7 @@ def plot_external_eval_avg_score(work_dir, lower_bound, upper_bound, show_progre
         x_steps.append(iteration.ai_eval.end_batch * x_scaling)
 
         if iteration.self_eval.new_better:
-            new_was_better.append(iteration.self_eval.end_batch * x_scaling)
+            new_was_better.append(iteration.ai_eval.end_batch * x_scaling)
 
     smoothed_wins = smooth_array(avg_score, smoothing)
 

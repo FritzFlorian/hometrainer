@@ -21,6 +21,7 @@ import json
 import signal
 import traceback
 import hometrainer.util as util
+import hometrainer.executors as executors
 
 
 class PlayingSlave:
@@ -241,7 +242,7 @@ class PlayingSlave:
     def _play_game(game_state, nn_executor_client, n_simulations, config):
         try:
             nn_executor_client.start(config)
-            selfplay_executor = core.SelfplayExecutor(game_state, nn_executor_client, n_simulations, config)
+            selfplay_executor = executors.SelfplayExecutor(game_state, nn_executor_client, n_simulations, config)
             result = selfplay_executor.run()
             nn_executor_client.stop()
         except Exception as e:
@@ -281,7 +282,7 @@ class PlayingSlave:
         nn_executor_one.start(config)
         nn_executor_two.start(config)
 
-        model_evaluator = core.ModelEvaluator(nn_executor_one, nn_executor_two, game_state, config)
+        model_evaluator = executors.ModelEvaluator(nn_executor_one, nn_executor_two, game_state, config)
         result = model_evaluator.run(n_simulations)
 
         nn_executor_one.stop()
@@ -316,7 +317,8 @@ class PlayingSlave:
     @staticmethod
     def _play_ai_evaluation_game(game_state, nn_executor_one, turn_time, config: Configuration):
         nn_executor_one.start(config)
-        ai_evaluator = config.external_ai_evaluator(nn_executor_one, game_state)
+        ai_evaluator = executors.ExternalEvaluator(nn_executor_one, config.external_ai_agent(game_state),
+                                                   game_state, config)
         result = ai_evaluator.run(turn_time)
         nn_executor_one.stop()
 
@@ -463,8 +465,8 @@ class TrainingMaster:
         self.progress.save_stats()
 
     def _setup_training_executor(self):
-        self.training_executor = core.TrainingExecutor(self.nn_client, os.path.join(self.work_dir, self.DATA_DIR),
-                                                       self.progress.stats.settings.training_history_size)
+        self.training_executor = executors.TrainingExecutor(self.nn_client, os.path.join(self.work_dir, self.DATA_DIR),
+                                                            self.progress.stats.settings.training_history_size)
 
     def _setup_training_threads(self):
         self.training_thread_one = threading.Thread(target=self._run_training_loop)
@@ -756,7 +758,6 @@ class TrainingRunStats:
             self.ai_eval.end_batch = 0
             self.ai_eval.nn_score = 0
             self.ai_eval.ai_score = 0
-
 
     def __init__(self):
         self.settings = self.Settings()

@@ -4,15 +4,34 @@ Overwrite it and pass it to the moving parts that depend on it.
 The Config is a 'programmer config' intended for projects that want to implement
 alpha zero for some game. It allows to do most stuff at runtime to allow for own policies
 on resource use and own runtime config passed by the user."""
-import hometrainer.definitions as definitions
 import zmq.auth
 import time
 import os
 
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# NN Server Settings
+SELFPLAY_NN_SERVER_PORT = 5100
+SELFEVAL_NN_SERVER_PORT = 5101
+TRAINING_NN_SERVER_PORT = 5102
+
+# Distribution settings
+TRAINING_MASTER_PORT = 5200
+
+# Settings for ZeroMQ security
+KEYS_DIR = os.path.join(ROOT_DIR, 'keys')
+PUBLIC_KEYS_DIR = os.path.join(KEYS_DIR, 'public_keys')
+PRIVATE_KEYS_DIR = os.path.join(KEYS_DIR, 'private_keys')
+SERVER_SECRET = os.path.join(PRIVATE_KEYS_DIR, 'server.key_secret')
+SERVER_PUBLIC = os.path.join(PUBLIC_KEYS_DIR, 'server.key')
+CLIENT_SECRET = os.path.join(PRIVATE_KEYS_DIR, 'client.key_secret')
+CLIENT_PUBLIC = os.path.join(PUBLIC_KEYS_DIR, 'client.key')
+
+
 class Configuration:
     def __init__(self):
-        self._training_master_port = definitions.TRAINING_MASTER_PORT
+        self._training_master_port = TRAINING_MASTER_PORT
 
         # Default Settings for Search/Training
         # Number of game states for one training batch
@@ -48,16 +67,16 @@ class Configuration:
         return False
 
     def zmq_client_secret(self):
-        return zmq.auth.load_certificate(definitions.CLIENT_SECRET)
+        return zmq.auth.load_certificate(CLIENT_SECRET)
 
     def zmq_server_secret(self):
-        return zmq.auth.load_certificate(definitions.SERVER_SECRET)
+        return zmq.auth.load_certificate(SERVER_SECRET)
 
     def zmq_server_public(self):
-        return zmq.auth.load_certificate(definitions.SERVER_PUBLIC)
+        return zmq.auth.load_certificate(SERVER_PUBLIC)
 
     def zmq_public_keys_dir(self):
-        return definitions.PUBLIC_KEYS_DIR
+        return PUBLIC_KEYS_DIR
 
     def nn_server_tensorboard_logdir(self, port, neural_network):
         return os.path.join(os.path.curdir, 'nn_logs/{}-{}'.format(port, round(time.time() * 1000)))
@@ -66,13 +85,13 @@ class Configuration:
         return self._training_master_port
 
     def nn_server_training_port(self):
-        return definitions.TRAINING_NN_SERVER_PORT
+        return TRAINING_NN_SERVER_PORT
 
     def nn_server_selfplay_port(self):
-        return definitions.SELFPLAY_NN_SERVER_PORT
+        return SELFPLAY_NN_SERVER_PORT
 
     def nn_server_selfeval_port(self):
-        return definitions.SELFEVAL_NN_SERVER_PORT
+        return SELFEVAL_NN_SERVER_PORT
 
     def training_batch_size(self):
         return self._training_batch_size
@@ -98,8 +117,8 @@ class Configuration:
     def needed_avg_self_eval_score(self):
         return self._needed_avg_self_eval_score
 
-    def external_ai_evaluator(self, nn_client, start_game_state):
-        """Returns an instance of the ExternalAIEvaluator subclass specific to your project."""
+    def external_ai_agent(self, start_game_state):
+        """Returns an instance of an Agent class that plays for the external AI to compare to."""
         raise NotImplementedError()
 
     def external_evaluation_possible(self):
