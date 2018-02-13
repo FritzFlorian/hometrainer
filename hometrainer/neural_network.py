@@ -189,13 +189,11 @@ def start_nn_server(port, nn_class_name, config: Configuration, nn_init_args=(),
 
 def _start_nn_server_internal(port, nn_class_name, batch_size, log_dir, start_batch,
                               nn_init_args, config: Configuration):
-    import hometrainer.nn_server as nn_server
-
     module_name, class_name = nn_class_name.rsplit('.', 1)
     nn_module = importlib.import_module(module_name)
     nn_class = getattr(nn_module, class_name)
 
-    server = nn_server.NeuralNetworkServer(port, nn_class(*nn_init_args), batch_size, config, start_batch=start_batch)
+    server = NeuralNetworkServer(port, nn_class(*nn_init_args), batch_size, config, start_batch=start_batch)
     server.run()
 
 

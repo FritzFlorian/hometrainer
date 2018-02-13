@@ -2,6 +2,7 @@ import hometrainer.core as core
 from hometrainer.config import Configuration
 import time
 import concurrent.futures
+import numpy as np
 
 
 class Agent:
@@ -88,7 +89,7 @@ class NeuralNetworkAgent(Agent):
     def _find_best_move(self):
         # Either select probabilistic or simply take the best move.
         if self.temperature:
-            move_probabilities = self.current_mcts_node.move_probabilities(self.temperature)
+            move_probabilities = self.current_mcts_node.move_probabilities(self.temperature).items()
             moves = [item[0] for item in move_probabilities]
             probabilities = [item[1] for item in move_probabilities]
 
@@ -96,11 +97,11 @@ class NeuralNetworkAgent(Agent):
             index = np.random.choice(len(moves), p=probabilities)
             return moves[index]
         else:
-            move_probabilities = self.current_mcts_node.move_probabilities(self.temperature)
+            move_probabilities = self.current_mcts_node.move_probabilities(1.0)
             best_move = None
             best_prob = -1
 
-            for move, prob in move_probabilities:
+            for move, prob in move_probabilities.items():
                 if prob > best_prob:
                     best_prob = prob
                     best_move = move
@@ -109,7 +110,7 @@ class NeuralNetworkAgent(Agent):
 
     def _create_evaluation(self):
         """Creates an evaluation of the current MCTSExecutor and adds it to the collected evaluations for this run"""
-        if not self.collected_evaluations:
+        if not self.collect_evaluations:
             return
 
         evaluation = self.current_mcts_node.game_state.wrap_in_evaluation()
@@ -119,7 +120,7 @@ class NeuralNetworkAgent(Agent):
 
     def move_executed(self, _, move, new_game_state):
         # Try to keep parts of the tree if possible
-        if self.current_mcts_node.children[move]:
+        if self.current_mcts_node and self.current_mcts_node.children and self.current_mcts_node.children[move]:
             self.current_mcts_node = self.current_mcts_node.children[move]
         else:
             self.current_mcts_node = core.MCTSNode(1.0, new_game_state, self.config)

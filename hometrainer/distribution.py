@@ -5,7 +5,6 @@ The distribution module allows one training master and many playing slaves to ge
 
 This is the highest level interface to use the """
 import hometrainer.core as core
-import hometrainer.nn_client as nn_client
 from hometrainer.config import Configuration
 import multiprocessing
 import zmq
@@ -22,6 +21,7 @@ import signal
 import traceback
 import hometrainer.util as util
 import hometrainer.executors as executors
+import hometrainer.neural_network as neural_network
 
 
 class PlayingSlave:
@@ -204,9 +204,9 @@ class PlayingSlave:
             self.nn_client_one.stop()
             time.sleep(15)
 
-        nn_client.start_nn_server(self.config.nn_server_selfplay_port(), self.nn_class_name_one, self.config)
+        neural_network.start_nn_server(self.config.nn_server_selfplay_port(), self.nn_class_name_one, self.config)
         self.nn_client_host_one = 'tcp://localhost:{}'.format(self.config.nn_server_selfplay_port())
-        self.nn_client_one = nn_client.NeuralNetworkClient(self.nn_client_host_one)
+        self.nn_client_one = neural_network.NeuralNetworkClient(self.nn_client_host_one)
         self.nn_client_one.start(self.config)
 
     def _restart_network_two(self, nn_class_name):
@@ -216,15 +216,15 @@ class PlayingSlave:
             self.nn_client_two.stop()
             time.sleep(15)
 
-        nn_client.start_nn_server(self.config.nn_server_selfeval_port(), self.nn_class_name_two, self.config)
+        neural_network.start_nn_server(self.config.nn_server_selfeval_port(), self.nn_class_name_two, self.config)
         self.nn_client_host_two = 'tcp://localhost:{}'.format(self.config.nn_server_selfeval_port())
-        self.nn_client_two = nn_client.NeuralNetworkClient(self.nn_client_host_two)
+        self.nn_client_two = neural_network.NeuralNetworkClient(self.nn_client_host_two)
         self.nn_client_two.start(self.config)
 
     def _play_games(self, n_games, game_states, simulations_per_turn):
         results = []
         for _ in range(n_games):
-            nn_executor_client = nn_client.NeuralNetworkClient(self.nn_client_host_one)
+            nn_executor_client = neural_network.NeuralNetworkClient(self.nn_client_host_one)
             game_state = np.random.choice(game_states)
 
             params = (game_state, nn_executor_client, simulations_per_turn, self.config)
@@ -242,7 +242,7 @@ class PlayingSlave:
     def _play_game(game_state, nn_executor_client, n_simulations, config):
         try:
             nn_executor_client.start(config)
-            selfplay_executor = executors.SelfplayExecutor(game_state, nn_executor_client, n_simulations, config)
+            selfplay_executor = executors.SelfplayExecutor(game_state, [nn_executor_client], n_simulations, config)
             result = selfplay_executor.run()
             nn_executor_client.stop()
         except Exception as e:
@@ -259,8 +259,8 @@ class PlayingSlave:
     def _self_evaluate(self, n_games, game_states, simulations_per_turn):
         results = []
         for _ in range(n_games):
-            nn_executor_client_one = nn_client.NeuralNetworkClient(self.nn_client_host_one)
-            nn_executor_client_two = nn_client.NeuralNetworkClient(self.nn_client_host_two)
+            nn_executor_client_one = neural_network.NeuralNetworkClient(self.nn_client_host_one)
+            nn_executor_client_two = neural_network.NeuralNetworkClient(self.nn_client_host_two)
 
             game_state = np.random.choice(game_states)
 
@@ -297,7 +297,7 @@ class PlayingSlave:
     def _ai_evaluate(self, n_games, game_states, turn_time):
         results = []
         for _ in range(n_games):
-            nn_executor_client_one = nn_client.NeuralNetworkClient(self.nn_client_host_one)
+            nn_executor_client_one = neural_network.NeuralNetworkClient(self.nn_client_host_one)
 
             game_state = np.random.choice(game_states)
 
@@ -442,9 +442,9 @@ class TrainingMaster:
             self.context.term()
 
     def _setup_nn(self):
-        nn_client.start_nn_server(self.config.nn_server_training_port(), self.nn_name, self.config,
+        neural_network.start_nn_server(self.config.nn_server_training_port(), self.nn_name, self.config,
                                   log_dir=self.log_dir, start_batch=self.progress.stats.progress.current_batch)
-        self.nn_client = nn_client.NeuralNetworkClient('tcp://localhost:{}'.format(self.config.nn_server_training_port()))
+        self.nn_client = neural_network.NeuralNetworkClient('tcp://localhost:{}'.format(self.config.nn_server_training_port()))
         self.nn_client.start(self.config)
 
         if self.progress.stats.progress.iteration > 0:

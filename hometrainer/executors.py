@@ -57,12 +57,12 @@ class GameExecutor:
 
         player_scores = current_game_state.calculate_scores()
         agent_scores = {agent: 0 for agent in self.agents}
-        for player, score in player_scores:
+        for player, score in player_scores.items():
             current_agent = self.player_mappings[player]
             agent_scores[current_agent] = agent_scores[current_agent] + score
 
         avg_agent_scores = dict()
-        for agent, score in agent_scores:
+        for agent, score in agent_scores.items():
             avg_agent_scores[agent] = score / self.agent_counts[agent]
 
         return avg_agent_scores
@@ -71,7 +71,7 @@ class GameExecutor:
         players = self.start_game_state.get_player_list()
 
         # Shuffle the agents to give no one an advantage
-        self.agents = np.random.shuffle(self.agents)
+        np.random.shuffle(self.agents)
         self.agent_counts = {agent: 0 for agent in self.agents}
         self.player_mappings = {}
 
@@ -214,13 +214,18 @@ class ModelEvaluator:
         """Executes the match between the two neural networks.
 
         Returns an array with [avg_score_nn_one, avg_score_nn_two]."""
-        agent_one = hometrainer.agents.NeuralNetworkAgent(self.nn_client_one, self.config)
-        agent_two = hometrainer.agents.NeuralNetworkAgent(self.nn_client_two, self.config)
+        try:
+            agent_one = hometrainer.agents.NeuralNetworkAgent(self.nn_client_one, self.config)
+            agent_two = hometrainer.agents.NeuralNetworkAgent(self.nn_client_two, self.config)
+            agents = [agent_one, agent_two]
 
-        game_executor = GameExecutor(self.start_game_state, [agent_one, agent_two])
-        agent_scores = game_executor.play_game(iteration_limit=n_simulations)
+            game_executor = GameExecutor(self.start_game_state, agents)
+            agent_scores = game_executor.play_game(iteration_limit=n_simulations)
 
-        return [agent_scores[agent_one], agent_scores[agent_two]]
+            return [agent_scores[agent_one], agent_scores[agent_two]]
+        except Exception:
+            import traceback
+            traceback.print_exc()
 
 
 class ExternalEvaluator:
