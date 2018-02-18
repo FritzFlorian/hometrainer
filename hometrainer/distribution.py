@@ -4,10 +4,10 @@ This is coordinating the training process and managing the results.
 The distribution module allows one training master and many playing slaves to generate data.
 
 This is the highest level interface to use the """
-import hometrainer.core as core
 from hometrainer.config import Configuration
 import multiprocessing
 import zmq
+import zmq.error
 import pickle
 import logging
 import time
@@ -130,7 +130,6 @@ class PlayingSlave:
                 self.nn_client_two.stop()
 
             self._disconnect_client()
-            self.context.term()
 
     def _handle_connections(self):
         last_work_result = self.EmptyWorkResult()
@@ -241,10 +240,8 @@ class PlayingSlave:
     @staticmethod
     def _play_game(game_state, nn_executor_client, n_simulations, config):
         try:
-            nn_executor_client.start(config)
             selfplay_executor = executors.SelfplayExecutor(game_state, [nn_executor_client], n_simulations, config)
             result = selfplay_executor.run()
-            nn_executor_client.stop()
         except Exception as e:
             # Print and re-raise the exception, as python will ignore it otherwise
             print(traceback.format_exc())
@@ -279,14 +276,8 @@ class PlayingSlave:
 
     @staticmethod
     def _play_evaluation_game(game_state, nn_executor_one, nn_executor_two, n_simulations, config):
-        nn_executor_one.start(config)
-        nn_executor_two.start(config)
-
         model_evaluator = executors.ModelEvaluator(nn_executor_one, nn_executor_two, game_state, config)
         result = model_evaluator.run(n_simulations)
-
-        nn_executor_one.stop()
-        nn_executor_two.stop()
 
         return result
 
@@ -316,11 +307,9 @@ class PlayingSlave:
 
     @staticmethod
     def _play_ai_evaluation_game(game_state, nn_executor_one, turn_time, config: Configuration):
-        nn_executor_one.start(config)
         ai_evaluator = executors.ExternalEvaluator(nn_executor_one, config.external_ai_agent(game_state),
                                                    game_state, config)
         result = ai_evaluator.run(turn_time)
-        nn_executor_one.stop()
 
         return result
 
@@ -433,13 +422,9 @@ class TrainingMaster:
             self.progress.save_stats()
 
             self.stopped = True
-            self.training_thread_one.join()
-            self.training_thread_two.join()
-
             self.nn_client.stop()
             self.server.setsockopt(zmq.LINGER, 0)
             self.server.close()
-            self.context.term()
 
     def _setup_nn(self):
         neural_network.start_nn_server(self.config.nn_server_training_port(), self.nn_name, self.config,
@@ -476,7 +461,10 @@ class TrainingMaster:
 
     def _run_training_loop(self):
         while not self.stopped:
-            self.training_executor.run_training_batch(self.progress.stats.settings.batch_size)
+            try:
+                self.training_executor.run_training_batch(self.progress.stats.settings.batch_size)
+            except zmq.error.ContextTerminated:
+                return
             self._add_training_progress()
 
     def _add_training_progress(self):
@@ -618,7 +606,6 @@ class TrainingMaster:
 
             logging.info('Finishing selfplay with result {} vs. {}'
                          .format(new_score, old_score))
-            self.progress.stats.current_epoch().self_eval.avg_score = new_score / n_games
             if new_score / n_games > self.progress.stats.settings.needed_avg_score:
                 logging.info('Choosing new weights, as it scored better then the current best.')
                 self.progress.stats.current_epoch().self_eval.new_better = True
@@ -800,8 +787,6 @@ class IterationSelfEvalMapper(kim.Mapper):
     start_batch = kim.field.Integer()
     end_batch = kim.field.Integer()
     new_better = kim.field.Boolean()
-    avg_score = kim.field.Float()
-
 
 class IterationSelfPlayMapper(kim.Mapper):
     __type__ = TrainingRunStats.Iteration.SelfPlay

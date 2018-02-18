@@ -24,22 +24,23 @@ class GameExecutor:
     Play a game with this starting game state between these participants and tell me the average score of each agent."""
     def __init__(self, start_game_state, agents):
         self.start_game_state = start_game_state
-        self.agents = agents
+        self.external_agents = agents
 
     def play_game(self, time_limit=None, iteration_limit=None):
         """Plays one game and returns the average scores of each agent."""
         if not time_limit and not iteration_limit:
             raise ValueError("At least one of 'time_limit' or 'iteration_limit' must be provided!")
 
-        for agent in self.agents:
-            agent.game_start(self.start_game_state)
-
         self._shuffle_player_mapping()
+
+        for player in self.start_game_state.get_player_list():
+            agent = self.player_executor_mappings[player]
+            agent.game_start(self.start_game_state, player)
 
         current_game_state = self.start_game_state
         while not current_game_state.is_finished():
             next_player = current_game_state.get_next_player()
-            current_agent = self.player_mappings[next_player]
+            current_agent = self.player_executor_mappings[next_player]
 
             if time_limit:
                 move = current_agent.find_move_with_time_limit(current_game_state, time_limit)
@@ -47,18 +48,18 @@ class GameExecutor:
                 move = current_agent.find_move_with_iteration_limit(current_game_state, iteration_limit)
 
             next_game_state = current_game_state.execute_move(move)
-            for agent in self.agents:
+            for agent in self.internal_agents:
                 agent.move_executed(current_game_state, move, next_game_state)
 
             current_game_state = next_game_state
 
-        for agent in self.agents:
+        for agent in self.internal_agents:
             agent.game_ended(current_game_state)
 
         player_scores = current_game_state.calculate_scores()
-        agent_scores = {agent: 0 for agent in self.agents}
+        agent_scores = {agent: 0 for agent in self.external_agents}
         for player, score in player_scores.items():
-            current_agent = self.player_mappings[player]
+            current_agent = self.player_result_mappings[player]
             agent_scores[current_agent] = agent_scores[current_agent] + score
 
         avg_agent_scores = dict()
@@ -71,15 +72,20 @@ class GameExecutor:
         players = self.start_game_state.get_player_list()
 
         # Shuffle the agents to give no one an advantage
-        np.random.shuffle(self.agents)
-        self.agent_counts = {agent: 0 for agent in self.agents}
-        self.player_mappings = {}
+        np.random.shuffle(self.external_agents)
+        self.agent_counts = {agent: 0 for agent in self.external_agents}
+        self.player_result_mappings = dict()
+        self.player_executor_mappings = dict()
 
         # Assign agents to each player in this game
         for i in range(len(players)):
-            agent = self.agents[i % len(self.agents)]
-            self.player_mappings[players[i]] = agent
+            agent = self.external_agents[i % len(self.external_agents)]
+            self.player_result_mappings[players[i]] = agent
+            self.player_executor_mappings[players[i]] = util.deepcopy(agent)
             self.agent_counts[agent] = self.agent_counts[agent] + 1
+
+        # Keep track of them as our 'internal' players
+        self.internal_agents = [agent for player, agent in self.player_executor_mappings.items()]
 
 
 class SelfplayExecutor:
@@ -106,7 +112,7 @@ class SelfplayExecutor:
         # Return all collected evaluation by each neural network agent.
         # This allows to have multiple agents play against each other and collect different stats, helping
         # with searching a diverse set of game states.
-        return [evaluation for agent in agents for evaluation in agent.collected_evaluations]
+        return [evaluation for agent in game_executor.internal_agents for evaluation in agent.collected_evaluations]
 
 
 class TrainingExecutor:
@@ -168,12 +174,15 @@ class TrainingExecutor:
 
             # Add every possible transformation to our samples
             if self.apply_transformations:
+                results = []
                 for evaluation in loaded_evaluations:
                     for i in evaluation.get_possible_transformations():
                         transformed_evaluation = evaluation.apply_transformation(i)
-                        loaded_evaluations.append(transformed_evaluation)
+                        results.append(transformed_evaluation)
 
-            return loaded_evaluations
+                return results
+            else:
+                return loaded_evaluations
 
     def load_weights(self, filename):
         with open(filename, 'rb') as file:

@@ -10,8 +10,11 @@ class Agent:
 
     The agent get's some more lifecycle callbacks if it needs to for example note moves of the enemy to
     improve its decisions. An agent is usually an AI program that calculates a good move,
-    but can also be an interface for an human player to compete in an match."""
-    def game_start(self, game_state):
+    but can also be an interface for an human player to compete in an match.
+
+    Note: Agents must be able to be copied, as they might be initialized multiple times for one match
+          with more than two players. This helps you if your agent holds player specific state."""
+    def game_start(self, game_state, agents_player):
         """Called when the new game starts. Can be used for setup code."""
         pass
 
@@ -51,13 +54,15 @@ class NeuralNetworkAgent(Agent):
         self.current_mcts_node = None
         self.thread_pool = None
 
-    def game_start(self, game_state):
+    def game_start(self, game_state, agents_player):
         self.current_mcts_node = core.MCTSNode(1.0, game_state, self.config)
 
         n_threads = self.config.n_search_threads_selfplay()
         self.thread_pool = None
         if n_threads > 1:
             self.thread_pool = concurrent.futures.ThreadPoolExecutor(n_threads)
+
+        self.nn_client.start(self.config)
 
     def find_move_with_time_limit(self, game_state, move_time):
         move_end_time = time.time() + move_time
@@ -133,3 +138,6 @@ class NeuralNetworkAgent(Agent):
 
         # Tear down any resources left
         self.thread_pool.shutdown(wait=False)
+
+        # Stop NN client
+        self.nn_client.stop()

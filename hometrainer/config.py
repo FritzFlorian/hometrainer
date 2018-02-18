@@ -4,7 +4,6 @@ Overwrite it and pass it to the moving parts that depend on it.
 The Config is a 'programmer config' intended for projects that want to implement
 alpha zero for some game. It allows to do most stuff at runtime to allow for own policies
 on resource use and own runtime config passed by the user."""
-import zmq.auth
 import time
 import os
 
@@ -18,15 +17,6 @@ TRAINING_NN_SERVER_PORT = 5102
 
 # Distribution settings
 TRAINING_MASTER_PORT = 5200
-
-# Settings for ZeroMQ security
-KEYS_DIR = os.path.join(ROOT_DIR, 'keys')
-PUBLIC_KEYS_DIR = os.path.join(KEYS_DIR, 'public_keys')
-PRIVATE_KEYS_DIR = os.path.join(KEYS_DIR, 'private_keys')
-SERVER_SECRET = os.path.join(PRIVATE_KEYS_DIR, 'server.key_secret')
-SERVER_PUBLIC = os.path.join(PUBLIC_KEYS_DIR, 'server.key')
-CLIENT_SECRET = os.path.join(PRIVATE_KEYS_DIR, 'client.key_secret')
-CLIENT_PUBLIC = os.path.join(PUBLIC_KEYS_DIR, 'client.key')
 
 
 class Configuration:
@@ -67,16 +57,16 @@ class Configuration:
         return False
 
     def zmq_client_secret(self):
-        return zmq.auth.load_certificate(CLIENT_SECRET)
+        raise NotImplementedError('Return the path to the client secret!')
 
     def zmq_server_secret(self):
-        return zmq.auth.load_certificate(SERVER_SECRET)
+        raise NotImplementedError('Return the path to the server secret!')
 
     def zmq_server_public(self):
-        return zmq.auth.load_certificate(SERVER_PUBLIC)
+        raise NotImplementedError('Return the path to the server public!')
 
     def zmq_public_keys_dir(self):
-        return PUBLIC_KEYS_DIR
+        raise NotImplementedError('Return the path to the public key dir!')
 
     def nn_server_tensorboard_logdir(self, port, neural_network):
         return os.path.join(os.path.curdir, 'nn_logs/{}-{}'.format(port, round(time.time() * 1000)))

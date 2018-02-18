@@ -149,7 +149,7 @@ class Evaluation:
         This will be used to alter the game_state for more training samples."""
         # By default we do not support any transformations.
         # If possible implement this as soon as the 'basics' work, as it helps a lot.
-        return []
+        return ['identity']
 
     def apply_transformation(self, transformation):
         """Returns the transformed evaluation and does not change the original data!
@@ -311,7 +311,8 @@ class MCTSNode:
         # It can be initialized with the initial move probabilities from the neural network.
         for next_state in next_states:
             move = next_state.get_last_move()
-            self.children[move] = MCTSNode(move_probabilities[move], next_state, self.config)
+            prob = move_probabilities[move]
+            self.children[move] = MCTSNode(prob, next_state, self.config)
 
     def _apply_virtual_loss(self):
         """Adds 'one instance' of virtual loss to this node."""
