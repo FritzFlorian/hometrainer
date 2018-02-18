@@ -193,7 +193,8 @@ def _start_nn_server_internal(port, nn_class_name, batch_size, log_dir, start_ba
     nn_module = importlib.import_module(module_name)
     nn_class = getattr(nn_module, class_name)
 
-    server = NeuralNetworkServer(port, nn_class(*nn_init_args), batch_size, config, start_batch=start_batch)
+    server = NeuralNetworkServer(port, nn_class(*nn_init_args), batch_size,
+                                 config=config, start_batch=start_batch, log_dir=log_dir)
     server.run()
 
 
@@ -267,7 +268,7 @@ class NeuralNetworkServer:
 
     This actually runs the neural network in a separate process.
     See the nn_client for details."""
-    def __init__(self, port, neural_network, batch_size, config: Configuration, start_batch=0):
+    def __init__(self, port, neural_network, batch_size, log_dir: None, config: Configuration, start_batch=0):
         self.port = port
         self.neural_network = neural_network
         self.input_conversion = neural_network.input_conversion_function()
@@ -278,7 +279,10 @@ class NeuralNetworkServer:
         self.batch_size = batch_size
         self.config = config
 
-        self.log_dir = config.nn_server_tensorboard_logdir(port, neural_network)
+        if log_dir:
+            self.log_dir = log_dir
+        else:
+            self.log_dir = config.nn_server_tensorboard_logdir(port, neural_network)
 
         self.n_batches_for_log = 100
         self.current_training_batch = start_batch
