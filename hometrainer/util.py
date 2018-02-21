@@ -103,12 +103,14 @@ def count_files(dir_path):
 def plot_external_eval_avg_score(work_dir, lower_bound, upper_bound, show_progress_lines,
                                  smoothing=0.1, min=-1, max=1, middle=0,
                                  x_label='Batch', y_label='Average Game Outcome',
-                                 smoothed_score_lable='Smoothed Score', score_label='Score'):
+                                 smoothed_score_lable='Smoothed Score', score_label='Score',
+                                 x_scaling=1, new_was_better_label='New weights better than previous'):
     """Returns a binary containing a plot of the current winrate."""
     import matplotlib.pyplot as plt
     import hometrainer.distribution as distribution
+    import matplotlib.patches as mpatches
 
-    x_scaling = 1  # No Scaling
+    x_scaling = x_scaling
 
     progress = distribution.TrainingRunProgress(os.path.join(work_dir, 'stats.json'))
     progress.load_stats()
@@ -131,14 +133,20 @@ def plot_external_eval_avg_score(work_dir, lower_bound, upper_bound, show_progre
 
     label_1, = plt.plot(x_steps, avg_score, linestyle='--', label=score_label)
     label_2, = plt.plot(x_steps, smoothed_wins, label=smoothed_score_lable)
-    plt.legend(handles=[label_1, label_2])
     plt.ylim(min, max)
     plt.xlabel(x_label)
     plt.ylabel(y_label)
     plt.axhline(y=middle, color='r')
     if show_progress_lines:
+        label_3 = None
         for better_x in new_was_better:
-            plt.axvline(x=better_x, linestyle=':')
+            label_3 = plt.axvline(x=better_x, linestyle=':', label=new_was_better_label)
+        if label_3:
+            plt.legend(handles=[label_1, label_2, label_3])
+        else:
+            plt.legend(handles=[label_1, label_2])
+    else:
+        plt.legend(handles=[label_1, label_2])
 
     result = io.BytesIO()
     plt.savefig(result, dpi=400)
