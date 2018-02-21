@@ -22,9 +22,12 @@ class GameExecutor:
 
     Effectively this can be used as:
     Play a game with this starting game state between these participants and tell me the average score of each agent."""
-    def __init__(self, start_game_state, agents):
+    def __init__(self, start_game_state, agents, add_up_time=False):
         self.start_game_state = start_game_state
         self.external_agents = agents
+
+        # If set to true players can save up time from past moves.
+        self.add_up_time = add_up_time
 
     def play_game(self, time_limit=None, iteration_limit=None):
         """Plays one game and returns the average scores of each agent."""
@@ -33,7 +36,9 @@ class GameExecutor:
 
         self._shuffle_player_mapping()
 
+        time_left = dict()
         for player in self.start_game_state.get_player_list():
+            time_left[player] = 0
             agent = self.player_executor_mappings[player]
             agent.game_start(self.start_game_state, player)
 
@@ -43,7 +48,17 @@ class GameExecutor:
             current_agent = self.player_executor_mappings[next_player]
 
             if time_limit:
-                move = current_agent.find_move_with_time_limit(current_game_state, time_limit)
+                time_left[next_player] = time_left[next_player] + time_limit
+                if self.add_up_time:
+                    final_time_limit = time_left[next_player]
+                else:
+                    final_time_limit = time_limit
+
+                before_move = time.time()
+                move = current_agent.find_move_with_time_limit(current_game_state, final_time_limit)
+                after_move = time.time()
+
+                time_left[next_player] = time_left[next_player] - (after_move - before_move)
             else:
                 move = current_agent.find_move_with_iteration_limit(current_game_state, iteration_limit)
 
