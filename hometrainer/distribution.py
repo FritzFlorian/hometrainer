@@ -131,6 +131,10 @@ class PlayingSlave:
 
             self._disconnect_client()
 
+            logging.info('Terminating process in 5 seconds...')
+            time.sleep(5)
+            os._exit(1)
+
     def _handle_connections(self):
         last_work_result = self.EmptyWorkResult()
 
@@ -425,6 +429,10 @@ class TrainingMaster:
             self.nn_client.stop()
             self.server.setsockopt(zmq.LINGER, 0)
             self.server.close()
+
+            logging.info('Terminating process in 5 seconds...')
+            time.sleep(5)
+            os._exit(1)
 
     def _setup_nn(self):
         neural_network.start_nn_server(self.config.nn_server_training_port(), self.nn_name, self.config,
