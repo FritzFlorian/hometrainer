@@ -623,7 +623,7 @@ class TrainingMaster:
         self._save_best_weights()
 
     def _handle_aieval_result(self, work_result):
-        logging.info('Getting Selfeval Results from Playing Slave (NN {} vs. AI {})'.format(work_result.nn_score, work_result.ai_score))
+        logging.info('Getting external AI evaluation Results from Playing Slave (NN {} vs. AI {})'.format(work_result.nn_score, work_result.ai_score))
 
         self.progress.stats.current_epoch().ai_eval.n_games += work_result.n_games
         self.progress.stats.current_epoch().ai_eval.ai_score += work_result.ai_score
