@@ -138,12 +138,17 @@ class TrainingExecutor:
 
     The training history size indicates how many of the last games to consider
     for training (e.g. use the 500 most recent games of training data)."""
-    def __init__(self, nn_client, data_dir, training_history_size, apply_transformations=True):
+    def __init__(self, nn_client, data_dir, training_history_size, apply_transformations=True, config=None):
         super().__init__()
         self.nn_client = nn_client
         self.training_history_size = training_history_size
 
         self.apply_transformations = apply_transformations
+
+        if config:
+            self.config = config
+        else:
+            self.config = Configuration()
 
         # We will keep the training and test data in a local folder.
         # This class is only responsible for somehow doing the training,
@@ -153,25 +158,45 @@ class TrainingExecutor:
         if not os.path.exists(self.data_dir):
             os.makedirs(self.data_dir)
 
+        self.test_data_dir = data_dir + '-test'
+        if not os.path.exists(self.test_data_dir):
+            os.makedirs(self.test_data_dir)
+
         self.lock = threading.Lock()
         self._current_number = util.count_files(self.data_dir)
+        self._current_test_number = util.count_files(self.test_data_dir)
 
     def add_examples(self, evaluations):
         with self.lock:
-            self._current_number = self._current_number + 1
+            total_number = self._current_number + self._current_test_number
 
-            with open(os.path.join(self.data_dir, "{0:010d}.pickle".format(self._current_number)), 'wb') as file:
+            # Keep some of the played games as test data to evaluate the neural network overfitting
+            if total_number % self.config.nn_test_set_step_size() == 0:
+                data_dir = self.test_data_dir
+                self._current_test_number += 1
+                number = self._current_test_number
+            else:
+                data_dir = self.data_dir
+                self._current_number += 1
+                number = self._current_number
+
+            with open(os.path.join(data_dir, "{0:010d}.pickle".format(number)), 'wb') as file:
                 pickle.dump(evaluations, file)
 
-    def get_examples(self, n_examples):
+    def get_examples(self, n_examples, test_example=False):
         with self.lock:
+            if test_example:
+                number = self._current_test_number
+            else:
+                number = self._current_number
+
             evaluations = []
             while len(evaluations) < n_examples:
-                oldest_index = max(1, self._current_number - self.training_history_size)
-                number = random.randint(oldest_index, self._current_number)
+                oldest_index = max(1, number - self.training_history_size)
+                number = random.randint(oldest_index, number)
 
                 try:
-                    loaded_evaluations = self._load_evaluations(number)
+                    loaded_evaluations = self._load_evaluations(number, test_example)
                 except IOError:
                     continue
 
@@ -183,8 +208,13 @@ class TrainingExecutor:
 
     # TODO: Make cache size adjustable
     @functools.lru_cache(maxsize=512)
-    def _load_evaluations(self, example_number):
-        with open(os.path.join(self.data_dir, "{0:010d}.pickle".format(example_number)), 'rb') as file:
+    def _load_evaluations(self, example_number, test_example):
+        if test_example:
+            data_dir = self.test_data_dir
+        else:
+            data_dir = self.data_dir
+
+        with open(os.path.join(data_dir, "{0:010d}.pickle".format(example_number)), 'rb') as file:
             loaded_evaluations = pickle.load(file)
 
             # Add every possible transformation to our samples
@@ -217,6 +247,16 @@ class TrainingExecutor:
 
         evaluations = self.get_examples(batch_size)
         self.nn_client.execute_training_batch(evaluations)
+
+    def run_logging_batch(self, batch_size=32):
+        # Skip if there is no data
+        if self._current_number <= 0:
+            time.sleep(10)
+            return
+
+        evaluations = self.get_examples(batch_size)
+        test_evaluations = self.get_examples(batch_size, test_example=True)
+        self.nn_client.execute_logging_batch(evaluations, test_evaluations)
 
     def log_loss(self, epoch, batch_size=32):
         raise NotImplementedError()

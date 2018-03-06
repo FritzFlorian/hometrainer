@@ -53,6 +53,10 @@ class Configuration:
         self._n_search_threads_self_eval = 8
         self._n_search_threads_selfplay = 8
 
+        # Config for stats on the neural network
+        self._nn_test_set_step_size = 10  # Every X executed game will be used to log a test error of the nn
+        self._nn_log_step_size = 100  # Every X executed training batch a log of the losses will be performed
+
     def zmq_use_secure_connection(self):
         return False
 
@@ -128,3 +132,9 @@ class Configuration:
 
     def n_search_threads_selfplay(self):
         return self._n_search_threads_selfplay
+
+    def nn_test_set_step_size(self):
+        return self._nn_test_set_step_size
+
+    def nn_log_step_size(self):
+        return self._nn_log_step_size

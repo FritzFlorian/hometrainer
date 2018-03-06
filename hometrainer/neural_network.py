@@ -103,8 +103,7 @@ class NeuralNetworkClient:
 
         return evaluation
 
-    def execute_training_batch(self, evaluations):
-        """Executes a batch of training using the given evaluations."""
+    def _evaluations_to_inputs(self, evaluations):
         inputs = []
         targets = []
         for evaluation in evaluations:
@@ -112,7 +111,19 @@ class NeuralNetworkClient:
             inputs.append(input_array)
             targets.append(target_array)
 
+        return inputs, targets
+
+    def execute_training_batch(self, evaluations):
+        """Executes a batch of training using the given evaluations."""
+        inputs, targets = self._evaluations_to_inputs(evaluations)
+
         return self.send_to_server(TrainingRequest(np.asarray(inputs), np.asarray(targets)))
+
+    def execute_logging_batch(self, evaluations, test_evaluations):
+        inputs, targets = self._evaluations_to_inputs(evaluations)
+        test_inputs, test_targets = self._evaluations_to_inputs(test_evaluations)
+
+        return self.send_to_server(LoggingRequest(inputs, targets, test_inputs, test_targets))
 
     def save_weights(self):
         """Saves the current weights to a binary of it's checkpoint."""
@@ -263,6 +274,17 @@ class TrainingRequest(AbstractMessage):
         self.target_arrays = target_arrays
 
 
+class LoggingRequest(AbstractMessage):
+    def __init__(self, input_arrays, target_arrays, test_input_arrays, test_target_arrays):
+        # Training Set
+        self.input_arrays = input_arrays
+        self.target_arrays = target_arrays
+
+        # Test Set
+        self.test_input_arrays = test_input_arrays
+        self.test_target_arrays = test_target_arrays
+
+
 class NeuralNetworkServer:
     """The server component of our decoupled neural network.
 
@@ -283,10 +305,11 @@ class NeuralNetworkServer:
             self.log_dir = log_dir
         else:
             self.log_dir = config.nn_server_tensorboard_logdir(port, neural_network)
+        self.test_log_dir = self.log_dir + '-test'
 
-        self.n_batches_for_log = 100
         self.current_training_batch = start_batch
         self.log_file_writer = None
+        self.test_log_file_writer = None
         self.graph = None
 
     def run(self):
@@ -325,6 +348,8 @@ class NeuralNetworkServer:
                                 self._process_execution_request(response_ids, message_content, sess)
                             elif isinstance(message_content, TrainingRequest):
                                 self._process_training_request(response_ids, message_content, sess)
+                            elif isinstance(message_content, LoggingRequest):
+                                self._process_logging_request(response_ids, message_content, sess)
                             elif isinstance(message_content, SaveWeightsRequest):
                                 self._process_save_weights_request(response_ids, message_content, sess)
                             elif isinstance(message_content, LoadWeightsRequest):
@@ -368,20 +393,24 @@ class NeuralNetworkServer:
         self.execution_responses = []
 
     def _process_training_request(self, response_ids, message_content, sess):
-        if not self.log_file_writer:
-            self.log_file_writer = tf.summary.FileWriter(self.log_dir, self.graph)
-
-        if self.current_training_batch % self.n_batches_for_log == 0:
-            # It's not smart to test with the training data.
-            # But as we do not really have a test set here and we
-            # will only train on this exact data after the summary data it seems 'ok' to do for now.
-            self.neural_network.log_training_progress(sess, self.log_file_writer, message_content.input_arrays,
-                                                      message_content.target_arrays, self.current_training_batch)
-
         # FIXME: Research what causes this call to leak memory if the inputs get too big.
         #        The leak happens at a fixed threshold on the input size (about 200).
         self.neural_network.train_batch(sess, message_content.input_arrays, message_content.target_arrays)
         self.current_training_batch += 1
+
+        response = Response(response_ids)
+        self.socket.send_multipart(response.to_multipart())
+
+    def _process_logging_request(self, response_ids, message_content, sess):
+        if not self.log_file_writer:
+            self.log_file_writer = tf.summary.FileWriter(self.log_dir, self.graph)
+        if not self.test_log_file_writer:
+            self.test_log_file_writer = tf.summary.FileWriter(self.test_log_dir, self.graph)
+
+        self.neural_network.log_training_progress(sess, self.log_file_writer, message_content.input_arrays,
+                                                  message_content.target_arrays, self.current_training_batch)
+        self.neural_network.log_training_progress(sess, self.test_log_file_writer, message_content.test_input_arrays,
+                                                  message_content.test_target_arrays, self.current_training_batch)
 
         response = Response(response_ids)
         self.socket.send_multipart(response.to_multipart())

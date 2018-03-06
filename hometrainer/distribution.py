@@ -469,11 +469,14 @@ class TrainingMaster:
 
     def _run_training_loop(self):
         while not self.stopped:
+            self._add_training_progress()
             try:
                 self.training_executor.run_training_batch(self.progress.stats.settings.batch_size)
+
+                if self.progress.stats.progress.current_batch % self.config.nn_log_step_size() == 0:
+                    self.training_executor.run_logging_batch(self.progress.stats.settings.batch_size)
             except zmq.error.ContextTerminated:
                 return
-            self._add_training_progress()
 
     def _add_training_progress(self):
         with self.training_progress_lock:
