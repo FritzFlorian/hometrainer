@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='hometrainer',
-      version='0.1.1',
+      version='0.1.2',
       description='Simple AlphaZero implementation',
       url='https://github.com/FritzFlorian/hometrainer',
       author='Fritz Florian',
