@@ -1,3 +1,7 @@
+"""The executors abstract the 'main' steps of the training:
+Selfplay, Selfeval, ExternalEval and Training.
+All these are kept in separate, easy to use classes.
+This allows to run the training at a relatively high level."""
 import hometrainer.agents
 from hometrainer.config import Configuration
 import threading

@@ -13,7 +13,7 @@ from hometrainer.config import Configuration
 
 
 class Move:
-    """Represents an executed move.
+    """Represents an executed move. Must be immutable!
 
     This is some sort of 'short' description
     on what the move was. In chess this would for example be 'white, Ke4'.
@@ -29,7 +29,7 @@ class Move:
 
 
 class GameState:
-    """Holds all information needed to describe one specific game state.
+    """Holds all information needed to describe one specific game state.  Must be immutable! (besides caching)
 
     This includes information on turn limits, active player and so on.
     Must also remember the last executed move (when using the execution logic)."""
@@ -94,7 +94,7 @@ class GameState:
 
 
 class Evaluation:
-    """The 'glue' between GameState and the neural Network.
+    """The 'glue' between GameState and the neural Network. Must be immutable! (besides caching)
 
     Holds move probabilities and the expected game outcome returned by the neural network.
     This will work for both directions: Training the neural network and using it to evaluate game states.

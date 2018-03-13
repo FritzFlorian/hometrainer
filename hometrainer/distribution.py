@@ -1,9 +1,11 @@
-"""Code that coordinates different steps defined in the core module.
+"""Code that coordinates different steps defined in the core and executors module.
 
 This is coordinating the training process and managing the results.
 The distribution module allows one training master and many playing slaves to generate data.
 
-This is the highest level interface to use the """
+This is the highest level interface to execute the whole training as one managed 'testrun'.
+On such testrun will be selfcontained in a single folder on the training master.
+The run can be paused an restarted whenever you want to."""
 from hometrainer.config import Configuration
 import multiprocessing
 import zmq
@@ -28,7 +30,11 @@ class PlayingSlave:
     """Runs selfplay games and evaluations using a given neural network configuration.
 
     The selfplay server reports it's results back to a master node.
-    The master node coordinates workloads, stores results and configures the worker."""
+    The master node coordinates workloads, stores results and configures the worker.
+
+    To run a playing slave all you have to do is to configure it with the masters
+    ip and port. Also make sure to run the same code version on each playing slave as
+    you run on your master."""
     TIMEOUT = 30
 
     class WorkResult:
@@ -342,7 +348,13 @@ class TrainingMaster:
     """Master Node that coordinates the training process.
 
     This will order slaves to execute selfplay, selfevaluation and aievaluation games,
-    collect the results and use them to train a neural network instance."""
+    collect the results and use them to train a neural network instance.
+
+    The work_dir, nn_name and start_game_states will be your main configuration.
+    work_dir is the path the current run is saved in.
+    nn_name is the FULL qualified name of the neural network to be used.
+    start_game_states are the 'maps' that will be played on. For most games this is simply an array containing
+    one element, the usual start state of the game."""
     class State(enum.Enum):
         SELFPLAY = 'SELFPLAY'
         SELFEVAL = 'SELFEVAL'
